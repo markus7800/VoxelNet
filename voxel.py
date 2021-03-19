@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def bravais_lattice(s, A, n=101, d=2):
+def bravais_lattice(s, A, n=101):
+    d = A.shape[0]
+
     xi = np.linspace(0,1,n)
     
     if d == 2:
@@ -16,7 +18,8 @@ def bravais_lattice(s, A, n=101, d=2):
     
     return (xi, SR)
 
-def reciprocal_lattice(s, A, n=101, g0=-16, g1=16, d=2):
+def reciprocal_lattice(s, A, n=101, g0=-16, g1=16):
+    d = A.shape[0]
     
     B = 2*np.pi * np.linalg.inv(A).T
     
@@ -109,5 +112,68 @@ def plot_2D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None):
         plt.xlim(xlims)
     if ylims:
         plt.ylim(ylims)
+    
+    plt.show()
+    
+    
+def reciprocal_lattice_gaussian(A, mus, sigma, g0=-16, g1=16):
+    d = A.shape[0]
+    
+    B = 2*np.pi * np.linalg.inv(A).T
+    
+    mi = np.arange(g0,g1+1)
+    m = len(mi)
+    
+    if d == 2:
+        m1, m2 = np.meshgrid(mi, mi)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m^2)
+    elif d == 3:
+        m1, m2, m3 = np.meshgrid(mi, mi, mi)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1))) # (3,m^3)
+
+    G = B.dot(M) # (d,m^d)
+    
+    GG = np.linalg.norm(G, axis=0) ** 2 # (m^d,)
+    
+    expGG = np.exp(-sigma**2 / 2 * GG) # (m^d,)
+
+    muG = mus.dot(G) # (n,d) * (d, m^d) = (n, m^d)
+    
+    expmuG = np.exp(-1j * muG) # (n, m^d)
+    
+    SG = 1/np.linalg.det(A) * expGG * np.sum(expmuG, axis=0) #(m*d,)
+
+    if d == 2:
+        SG = SG.reshape(m,m)
+    elif d == 3:
+        SG = SG.reshape(m,m,m)
+
+    return (B, mi, SG)
+
+
+from mpl_toolkits.mplot3d import Axes3D
+def plot_3D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None, zlims=None):
+    absSG = np.abs(SG)
+    
+   # plt.xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
+    #plt.ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
+        
+    fig = plt.figure(figsize=(4,4))
+    ax = Axes3D(fig)
+    
+    m1, m2, m3 = np.meshgrid(mi, mi, mi)
+    M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1)))
+    G = B.dot(M)
+    
+    max_sg = absSG.max()
+    colors = [(1.,0.,0.,v) for v in absSG.reshape(-1) / max_sg]
+    ax.scatter(G[0,:], G[1,:], G[2,:], c=colors)
+    if xlims:
+        ax.set_xlim(xlims)
+    if ylims:
+        ax.set_ylim(ylims)
+    if zlims:
+        ax.set_zlim(zlims)
+    
     
     plt.show()

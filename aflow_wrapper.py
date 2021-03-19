@@ -11,15 +11,17 @@ def aflow_fetch(species):
             ).orderby(K.enthalpy_atom)
     
     df = pd.DataFrame(columns=[
-    "catalog", "compound", "composition", "species", "natoms",
+    "auid", "catalog",
+    "compound", "composition", "species", "natoms",
     "geometry", "positions_fractional",
     "enthalpy_atom"
     ])
     
     counter = 1
     for entry in result:
-        print(f"{counter}. Found compound", entry.compound)
+        print(f"{counter}. Found compound", entry.compound, "with auid", entry.auid)
         row = {
+            "auid": entry.auid,
             "catalog": entry.catalog.rstrip("\n"),
             "compound": entry.compound,
             "composition": entry.composition,
@@ -72,21 +74,30 @@ def calc_cartesian_positions(A, positions_fractional):
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-def plot_3D_crystal(A, crystal):
+def plot_3D_crystal(crystal):
+    A = calc_basis(crystal.geometry)
+
     fig = plt.figure()
     ax = Axes3D(fig)
     
     colors = ["red", "green", "blue", "orange", "purple", "black"]
     
     cs = []
+    legend_handels = []
+    
     for i, n in enumerate(crystal.composition):
         cs = cs + [colors[i]]*n
-
+        legend_element = plt.Line2D([0], [0], marker='o', color="w",
+                                    markerfacecolor= colors[i], label=crystal.species[i], markersize=10)
+        legend_handels.append(legend_element)
 
     poss = calc_cartesian_positions(A, crystal.positions_fractional)
     ax.scatter(poss[:,0], poss[:,1], poss[:,2], alpha=1, c=cs, s=25)
     for i in range(3):
         ax.plot([0, A[0,i]], [0,A[1,i]], [0,A[2,i]])
      
-    plt.title(crystal.compound)
+    
+    
+    plt.suptitle(crystal.compound)
+    ax.legend(handles=legend_handels)
     plt.show()
