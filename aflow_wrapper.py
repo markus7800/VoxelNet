@@ -64,9 +64,29 @@ def calc_basis(geometry):
 
 
 def calc_cartesian_positions(A, positions_fractional):
-    #for p in positions_fractional:
-    #    print(A.dot(p))
     positions_cartesian = np.apply_along_axis(
         lambda p: A.dot(p), 1, positions_fractional
     )
     return positions_cartesian
+
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+def plot_3D_crystal(A, crystal):
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    
+    colors = ["red", "green", "blue", "orange", "purple", "black"]
+    
+    cs = []
+    for i, n in enumerate(crystal.composition):
+        cs = cs + [colors[i]]*n
+
+
+    poss = calc_cartesian_positions(A, crystal.positions_fractional)
+    ax.scatter(poss[:,0], poss[:,1], poss[:,2], alpha=1, c=cs, s=25)
+    for i in range(3):
+        ax.plot([0, A[0,i]], [0,A[1,i]], [0,A[2,i]])
+     
+    plt.title(crystal.compound)
+    plt.show()
