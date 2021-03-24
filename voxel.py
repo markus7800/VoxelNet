@@ -12,7 +12,7 @@ def bravais_lattice(s, A, n=101):
         
     R = A.dot(X) # (2,n*n)
         
-    SR = np.apply_along_axis(s, 0, R) # apply field column-wise, (1,n*n)
+    SR = s(R) # (n*n, )
     
     SR = SR.reshape(n,n)
     
@@ -44,7 +44,7 @@ def reciprocal_lattice(s, A, n=101, g0=-16, g1=16):
     
     E = np.exp(-1j * XR) # (n*n, m*m)
 
-    SR = np.apply_along_axis(s, 0, R) # apply field column-wise, (n*n,)
+    SR = s(R) # (n*n, )
 
     delta = (xi[1] - xi[0])**d
     SG = delta * SR.dot(E) # (m*m,)
