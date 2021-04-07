@@ -8,12 +8,15 @@ def aflow_fetch(species):
     result = search(batch_size=20
             ).filter(K.species == species_query_string
             ).filter(K.nspecies == len(species)
-            ).orderby(K.enthalpy_atom)
+            ).orderby(K.enthalpy_atom
+            ).select(K.compound, K.composition, K.species, K.natoms,
+                      K.geometry, K.natoms, K.positions_fractional, K.positions_cartesian,
+                      K.enthalpy_atom)
     
     df = pd.DataFrame(columns=[
-    "auid", "catalog",
+    "auid", "aurl",
     "compound", "composition", "species", "natoms",
-    "geometry", "positions_fractional",
+    "geometry", "positions_fractional", "positions_cartesian",
     "enthalpy_atom"
     ])
     
@@ -22,13 +25,17 @@ def aflow_fetch(species):
         print(f"{counter}. Found compound", entry.compound, "with auid", entry.auid)
         row = {
             "auid": entry.auid,
-            "catalog": entry.catalog.rstrip("\n"),
+            "aurl": entry.aurl,
+            
             "compound": entry.compound,
             "composition": entry.composition,
-            "natoms": entry.natoms,
             "species": entry.species,
+            "natoms": entry.natoms,
+            
             "geometry": entry.geometry,
             "positions_fractional": entry.positions_fractional,
+            "positions_cartesian": entry.positions_cartesian,
+            
             "enthalpy_atom": entry.enthalpy_atom
         }
         df = df.append(row, ignore_index=True)
