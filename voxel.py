@@ -163,18 +163,11 @@ def reciprocal_lattice_gaussian(A, mus, sigma, g0=-16, g1=16):
 
 
 from mpl_toolkits.mplot3d import Axes3D
-def plot_3D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None, zlims=None):
+def plot_3D_reciprocal_lattice(B, G, SG, xlims=None, ylims=None, zlims=None, L=None, N=None):
     absSG = np.abs(SG)
-    
-   # plt.xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
-    #plt.ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
         
     fig = plt.figure(figsize=(4,4))
     ax = Axes3D(fig)
-    
-    m1, m2, m3 = np.meshgrid(mi, mi, mi)
-    M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1)))
-    G = B.dot(M)
     
     max_sg = absSG.max()
     colors = [(1.,0.,0.,v) for v in absSG.reshape(-1) / max_sg]
