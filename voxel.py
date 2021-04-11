@@ -18,40 +18,42 @@ def bravais_lattice(s, A, n=101):
     
     return (xi, SR)
 
-def reciprocal_lattice(s, A, n=101, g0=-16, g1=16):
+def reciprocal_lattice(s, A, n=101, mx=None, my=None):
     d = A.shape[0]
     
     B = 2*np.pi * np.linalg.inv(A).T
     
     xi = np.linspace(0,1,n)
-    mi = np.arange(g0,g1+1)
-    m = len(mi)
+    
+    n_mx = len(mx)
+    n_my = len(my)
+    
     
     if d == 2:
         x1, x2 = np.meshgrid(xi, xi)
-        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n) n = len(xi)
         
-        m1, m2 = np.meshgrid(mi, mi)
-        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m*m)
+        m1, m2 = np.meshgrid(mx, my)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,n_mx*n_my)
     else:
         raise ValueError("Not implemented")
 
         
     R = A.dot(X) # (2,n*n)
-    G = B.dot(M) # (2,m*m)
+    G = B.dot(M) # (2,n_mx*n_my)
     
-    XR = R.T.dot(G) # (n*n, m*m) (=2 * np.pi * X.T.dot(M))
+    XR = R.T.dot(G) # (n*n, n_mx*n_my) (=2 * np.pi * X.T.dot(M))
     
-    E = np.exp(-1j * XR) # (n*n, m*m)
+    E = np.exp(-1j * XR) # (n*n, n_mx*n_my)
 
     SR = s(R) # (n*n, )
 
     delta = (xi[1] - xi[0])**d
-    SG = delta * SR.dot(E) # (m*m,)
+    SG = delta * SR.dot(E) # (n_mx*n_my,)
     
-    SG = SG.reshape(m,m)
+    SG = SG.reshape(n_mx*n_my)
     
-    return (B, mi, SG)
+    return (B, M, SG)
 
 
 def plot_2D_realspace_lattice(A, xi, SR):
@@ -86,19 +88,19 @@ def plot_2D_bravais_lattice(A, xi, SR):
     plt.show()
     
     
-def plot_2D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None):
+def plot_2D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None, L=None, N=None):
     absSG = np.abs(SG)
     
-    fig = plt.figure(figsize=(5,4))
-    ax = fig.add_subplot(111)
-    ax.set_aspect('equal')
-    plt.pcolormesh(mi, mi, absSG, shading='auto')
-    plt.colorbar()
+    # fig = plt.figure(figsize=(5,4))
+    # ax = fig.add_subplot(111)
+    # ax.set_aspect('equal')
+    # plt.pcolormesh(mi, mi, absSG, shading='auto')
+    # plt.colorbar()
     
-    plt.xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
-    plt.ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
+    # plt.xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
+    # plt.ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
     
-    plt.show()
+    # plt.show()
     
     plt.figure(figsize=(4,4))
     m1, m2 = np.meshgrid(mi, mi)
@@ -106,12 +108,21 @@ def plot_2D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None):
     G = B.dot(M)
     
     max_sg = absSG.max()
-    colors = [(1.,0.,0.,v) for v in absSG.reshape(-1) / max_sg]
+    colors = [(1.,0.,0.,v) for v in np.maximum(absSG.reshape(-1) / max_sg, 0.1)]
     plt.scatter(G[0,:], G[1,:], c=colors)
-    if xlims:
-        plt.xlim(xlims)
-    if ylims:
-        plt.ylim(ylims)
+    if L and N:   
+        e = 2*np.pi/L * N / 2
+        ticks = np.arange(-e, e, 2*np.pi/L)
+        plt.xticks(ticks, rotation=90)
+        plt.yticks(ticks)
+        plt.xlim((-e,e))
+        plt.ylim((-e,e))
+        plt.grid(True)
+    else:
+        if xlims:
+            plt.xlim(xlims)
+        if ylims:
+            plt.ylim(ylims)
     
     plt.show()
     
