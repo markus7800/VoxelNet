@@ -1,7 +1,89 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
+
+def get_nD_gaussian(A, mus, sigma, K):
+    """
+    Returns field where Gaussians with standard deviation sigma are placed at centres mus repeated according to A.
+    
+    Mathematically,
+    s(x) = sum_i sum_(k in Z^d) N(x, mu[i] + A k, sigma) where N is the pdf of a Gaussian and Z^d are integer tuples
+    
+    As Gaussians have infinite range, K specifies how often the centres are repeated for the approximation.
+    For example, if we have a two dimensional crystal with atom at [0,0] and A = [1,0; 0,1]
+    then the atom should be repeated at each integer pair [i,j] in Z^2.
+    In this case, K=3 specifies that we sum over [-3,3]^2.
+    
+    This is the current bottleneck for 3 dimensional voxelization.
+    
+    Parameters
+    ----------
+        A: d x d matrix
+            basis of unit cell
+            
+        mus: np.array with shape (n, d)
+            coordinates corresponding to n atoms within unit cell (atoms repeat according to A)
+        
+        sigma: Float
+            standard deviations for the Guassians
+            
+        K: Int
+            see above
+    """
+    
+    new_mus = []
+    d = A.shape[0]
+    
+    if d == 2:
+        for kx in np.arange(-K,K+1):
+            for ky in np.arange(-K,K+1):
+                for mu in mus:
+                    Ak = A.dot([kx,ky])
+                    new_mus.append(Ak+mu)
+    if d == 3:
+        for kx in np.arange(-K,K+1):
+            for ky in np.arange(-K,K+1):
+                for kz in np.arange(-K,K+1):
+                    for mu in mus:
+                        Ak = A.dot([kx,ky,kz])
+                        new_mus.append(Ak+mu)
+    
+    new_mus = np.array(new_mus)
+    nmus, d = new_mus.shape
+    
+    mus3 = new_mus.T.reshape(d,1,nmus)
+    
+    def s(X):
+        d2, n = X.shape
+        assert(d == d2)
+        
+        X_centered = X.reshape(d,n,1) - mus3 # (d, n, nmus)
+        
+        XX = np.sum(X_centered * X_centered, axis=0) # (n, nmus)
+        
+        EXX = np.exp(- XX / (2 * sigma**2)) # (n, nmus)
+        
+        res = np.sum(EXX, axis=1) # (n,)
+
+        return res / (2*np.pi * sigma**2)
+        
+    return s
 
 def bravais_lattice(s, A, n=101):
+    """
+    Evaluates the field s over the unit cell spanned by the d x d matrix A.
+    
+    Each axis is discretised with n points.
+    
+    Returns
+    -------
+        R: np.array with shape (d, n ** d)
+            vectors in unit cell A([0,1]^d)
+
+        SR: np.array with shape (n ** d, )
+            field quantities evaluated at the vectors of R
+    """
+    
     d = A.shape[0]
 
     xi = np.linspace(0,1,n)
@@ -10,57 +92,25 @@ def bravais_lattice(s, A, n=101):
         x1, x2 = np.meshgrid(xi, xi)
         X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n)
         
-    R = A.dot(X) # (2,n*n)
+    if d == 3:
+        x1, x2, x3 = np.meshgrid(xi, xi, xi)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1), x3.reshape(1,-1))) # (3,n*n*n)
         
-    SR = s(R) # (n*n, )
+    R = A.dot(X) # (d,n^d)
+        
+    SR = s(R) # (n^d, )
     
     SR = SR.reshape(n,n)
     
-    return (xi, SR)
+    return (R, SR)
 
-def reciprocal_lattice(s, A, n=101, mx=None, my=None):
-    d = A.shape[0]
     
-    B = 2*np.pi * np.linalg.inv(A).T
+def plot_2D_realspace_lattice(A, R, SR):
+    """
+    Plots the results of bravais_lattice(s, A) in cartesian space.
+    """
     
-    xi = np.linspace(0,1,n)
-    
-    n_mx = len(mx)
-    n_my = len(my)
-    
-    
-    if d == 2:
-        x1, x2 = np.meshgrid(xi, xi)
-        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n) n = len(xi)
-        
-        m1, m2 = np.meshgrid(mx, my)
-        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,n_mx*n_my)
-    else:
-        raise ValueError("Not implemented")
-
-        
-    R = A.dot(X) # (2,n*n)
-    G = B.dot(M) # (2,n_mx*n_my)
-    
-    XR = R.T.dot(G) # (n*n, n_mx*n_my) (=2 * np.pi * X.T.dot(M))
-    
-    E = np.exp(-1j * XR) # (n*n, n_mx*n_my)
-
-    SR = s(R) # (n*n, )
-
-    delta = (xi[1] - xi[0])**d
-    SG = delta * SR.dot(E) # (n_mx*n_my,)
-    
-    SG = SG.reshape(n_mx*n_my)
-    
-    return (B, M, SG)
-
-
-def plot_2D_realspace_lattice(A, xi, SR):
-    n = len(xi)
-    x1, x2 = np.meshgrid(xi, xi)
-    X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n)
-    R = A.dot(X)
+    n = np.int(np.sqrt(R.shape[1]))
     r1 = R[0,:].reshape(n,n)
     r2 = R[1,:].reshape(n,n)
     
@@ -73,111 +123,364 @@ def plot_2D_realspace_lattice(A, xi, SR):
     plt.pcolormesh(r1, r2, SR, shading='auto')    
     plt.colorbar()
     plt.show()
+
     
+def reciprocal_lattice(s, A, mx=None, my=None, mz=None, n=101, verbose=False):
+    """
+    Evaluates the field quantity s over the reciprocal space via the Fourier Transform.
     
-def plot_2D_bravais_lattice(A, xi, SR):
-    fig = plt.figure(figsize=(5,4))
-    ax = fig.add_subplot(111)
-    ax.set_aspect('equal')
-    plt.pcolormesh(xi, xi, SR, shading='auto')
+    h(g) = 1/vol(V) int_V s(r) exp(-i g . r) dr
     
-    plt.xlabel(f"a1 = ({A[0,0]:.2f}, {A[1,0]:.2f})")
-    plt.ylabel(f"a2 = ({A[0,1]:.2f}, {A[1,1]:.2f})")
+    Here the Fourier Transform is realised via numerical integration.
     
-    plt.colorbar()
-    plt.show()
+    Let B = 2pi inv(A.T) be d x d matrix corresponding to the basis of the reciprocal space.
+    h is only evaluated at integer multiples of the basis vectors,  B Z^d
     
+    Paramters
+    ---------
+        s: function mapping np.array to np.array
+            field quantity
+            
+        A: d x d matrix
+            basis of unit cell
+        
+        mx, my, mz: np.array
+            integer ranges, h is evaluated over B (mx x my x mz)
+            mz is only required for the 3 dimensional case
+            
+        n: Int
+            number of points per axis for numerical integration
+            thus we evaluate and sum over n ** d points
+        
+        verbose: Bool
+            if True the computation time is printed
+            
+    Returns
+    -------
+        B: d x d matrix
+            basis of reciprocal space
+        
+        G: np.array with shape (d, len(mx) * len(my) * len(mz))
+            reciprocal vectors
+            
+        SG: np.array with shape (len(mx) * len(my) * len(mz), )
+            field quantities evaluated at the vectors of G
     
-def plot_2D_reciprocal_lattice(B, mi, SG, xlims=None, ylims=None, L=None, N=None):
-    absSG = np.abs(SG)
+    """
     
-    # fig = plt.figure(figsize=(5,4))
-    # ax = fig.add_subplot(111)
-    # ax.set_aspect('equal')
-    # plt.pcolormesh(mi, mi, absSG, shading='auto')
-    # plt.colorbar()
-    
-    # plt.xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
-    # plt.ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
-    
-    # plt.show()
-    
-    plt.figure(figsize=(4,4))
-    m1, m2 = np.meshgrid(mi, mi)
-    M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1)))
-    G = B.dot(M)
-    
-    max_sg = absSG.max()
-    colors = [(1.,0.,0.,v) for v in np.maximum(absSG.reshape(-1) / max_sg, 0.1)]
-    plt.scatter(G[0,:], G[1,:], c=colors)
-    if L and N:   
-        e = 2*np.pi/L * N / 2
-        ticks = np.arange(-e, e, 2*np.pi/L)
-        plt.xticks(ticks, rotation=90)
-        plt.yticks(ticks)
-        plt.xlim((-e,e))
-        plt.ylim((-e,e))
-        plt.grid(True)
-    else:
-        if xlims:
-            plt.xlim(xlims)
-        if ylims:
-            plt.ylim(ylims)
-    
-    plt.show()
-    
-    
-def reciprocal_lattice_gaussian(A, mus, sigma, g0=-16, g1=16):
     d = A.shape[0]
     
     B = 2*np.pi * np.linalg.inv(A).T
     
-    mi = np.arange(g0,g1+1)
-    m = len(mi)
+    xi = np.linspace(0,1,n)
+    
     
     if d == 2:
-        m1, m2 = np.meshgrid(mi, mi)
-        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m^2)
+        x1, x2 = np.meshgrid(xi, xi)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n) n = len(xi)
+        
+        m1, m2 = np.meshgrid(mx, my)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m) m = len(mx) * len(my)
     elif d == 3:
-        m1, m2, m3 = np.meshgrid(mi, mi, mi)
-        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1))) # (3,m^3)
+        x1, x2, x3 = np.meshgrid(xi, xi, xi)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1), x3.reshape(1,-1))) # (2,n*n*n) n = len(xi)
+        
+        m1, m2, m3 = np.meshgrid(mx, my, mz)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1))) # (3,m) m = len(mx) * len(my) * len(mz)
 
-    G = B.dot(M) # (d,m^d)
+        
+    R = A.dot(X) # (d,n^d)
+    G = B.dot(M) # (d,m)
     
-    GG = np.linalg.norm(G, axis=0) ** 2 # (m^d,)
+    t0 = time.time()
     
-    expGG = np.exp(-sigma**2 / 2 * GG) # (m^d,)
+    SR = s(R) # (n^d, )
+    
+    t1 = time.time()
+    
+    if verbose: print(f"Evaluated field at {R.shape[1]} points in {t1-t0:.2f} seconds.")
+    
+    XR = R.T.dot(G) # (n^d, m) (= 2 * np.pi * X.T.dot(M))
+    
+    E = np.exp(-1j * XR) # (n^d, m)
 
-    muG = mus.dot(G) # (n,d) * (d, m^d) = (n, m^d)
+
+    delta = (xi[1] - xi[0])**d
+    SG = delta * SR.dot(E) # (m,)
     
-    expmuG = np.exp(-1j * muG) # (n, m^d)
+    t2 = time.time()
+    if verbose: print(f"Performed Fourier Transform in {t2-t1:.2f} seconds.")
+
+            
+    return (B, G, SG)
+
+from numpy.fft import fftn
+def reciprocal_lattice_fft(s, A, mx=None, my=None, mz=None, n=101, verbose=False):
+    """
+    Same as reciprocal_lattice but uses numpy's fft
+    """
+    d = A.shape[0]
+    
+    B = 2*np.pi * np.linalg.inv(A).T
+    
+    xi = np.linspace(0,1,n)
+    x_shape = (0,)
+    
+    if d == 2:
+        x1, x2 = np.meshgrid(xi, xi)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1))) # (2,n*n) n = len(xi)
+        x_shape = (n,n)
+        
+        m1, m2 = np.meshgrid(mx, my)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m) m = len(mx) * len(my)
+        
+    elif d == 3:
+        x1, x2, x3 = np.meshgrid(xi, xi, xi)
+        X = np.vstack((x1.reshape(1,-1), x2.reshape(1,-1), x3.reshape(1,-1))) # (2,n*n*n) n = len(xi)
+        x_shape = (n,n,n)
+        
+        m1, m2, m3 = np.meshgrid(mx, my, mz)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1))) # (3,m) m = len(mx) * len(my) * len(mz)
+
+        
+    R = A.dot(X) # (d,n^d)
+    G = B.dot(M) # (d,m)
+
+    t0 = time.time()
+    SR = s(R) # (n^d, )
+    t1 = time.time()
+    
+    print(f"Evaluated field at {SR.shape[0]} points in {t1-t0} seconds.")
+
+    delta = (xi[1] - xi[0])**d
+    SG_ftt = delta * fftn(SR.reshape(x_shape)) # (n,n[,n])
+    
+    SG = np.zeros((G.shape[1],), dtype=np.complex64)
+    for i in range(G.shape[1]):
+        index = M[:,i].astype(np.int)
+        index[index < 0] += n
+        SG[i] = SG_ftt[tuple(index)]
+        
+        
+    t2 = time.time()
+    if verbose: print(f"Performed Fourier Transform in {t2-t1:.2f} seconds.")
+        
+    
+    return (B, G, SG)
+
+def reciprocal_lattice_gaussian(A, mus, sigma, mx=None, my=None, mz=None):
+    """
+    Evaluates the Gaussian field quantity
+    
+    s(x) = sum_i sum_(k in Z^d) N(x, mu[i] + A k, sigma), where the inner sum is over integer vectors
+    
+    over the reciprocal space via the Fourier Transform.
+    
+    h(g) = 1/vol(V) int_V s(r) exp(-i g . r) dr
+    
+    The field quanitity is evaluated based on theoretical derivation.
+    
+    Let B = 2pi inv(A.T) be d x d matrix corresponding to the basis of the reciprocal space.
+    h is only evaluated at integer multiples of the basis vectors,  B Z^d
+    
+    Paramters
+    ---------
+        A: d x d matrix
+            basis of unit cell
+            
+        mus: np.array with shape (n, d)
+            coordinates corresponding to n atoms within unit cell (atoms repeat according to A)
+        
+        sigma: Float
+            standard deviations for the Guassians
+        
+        mx, my, mz: np.array
+            integer ranges, h is evaluated over B (mx x my x mz)
+            mz is only required for the 3 dimensional case
+            
+    Returns
+    -------
+        B: d x d matrix
+            basis of reciprocal space
+        
+        G: np.array with shape (d, len(mx) * len(my) * len(mz))
+            reciprocal vectors
+            
+        SG: np.array with shape (len(mx) * len(my) * len(mz), )
+            field quantities evaluated at the vectors of G
+    
+    """
+    
+    d = A.shape[0]
+    
+    B = 2*np.pi * np.linalg.inv(A).T
+    
+    if d == 2:
+        m1, m2 = np.meshgrid(mx, my)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1))) # (2,m) m = len(mx) * len(mz)
+    elif d == 3:
+        m1, m2, m3 = np.meshgrid(mx, my, mz)
+        M = np.vstack((m1.reshape(1,-1), m2.reshape(1,-1), m3.reshape(1,-1))) # (3,m) m = len(mx) * len(my) * len(mz)
+
+    G = B.dot(M) # (d,m)
+    
+    GG = np.linalg.norm(G, axis=0) ** 2 # (m,)
+    
+    expGG = np.exp(-sigma**2 / 2 * GG) # (m,)
+
+    muG = mus.dot(G) # (n,d) * (d, m) = (n, m)
+    
+    expmuG = np.exp(-1j * muG) # (n, m)
     
     SG = 1/np.linalg.det(A) * expGG * np.sum(expmuG, axis=0) #(m*d,)
 
-    if d == 2:
-        SG = SG.reshape(m,m)
-    elif d == 3:
-        SG = SG.reshape(m,m,m)
-
-    return (B, mi, SG)
+    return (B, G, SG)
 
 
-from mpl_toolkits.mplot3d import Axes3D
+def plot_2D_reciprocal_lattice(B, mx, my, G, SG, xlims=None, ylims=None, L=None, N=None):
+    """"
+    Plot results of reciprocal_lattice_ functions.
+    
+    Left plot:
+    all evaluated absolute field quantities in the basis
+    
+    Right plot:
+    evaluated absolute field quantities in cartesian space
+    if L and N is specified this plot will crop to the square [-pi/L*N, pi/L*N]^2 = [-pi/delta_L, pi/delta_L]^2
+    otherwise you can specify xlims and ylims
+    """
+    
+    absSG = np.abs(SG)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
+    ax1.set_aspect('equal')
+    cmesh = ax1.pcolormesh(mx, my, absSG.reshape((len(my), len(mx))), shading='auto')
+    plt.colorbar(cmesh, ax=ax1)
+    
+    ax1.set_xlabel(f"b1 = ({B[0,0]:.2f}, {B[1,0]:.2f})")
+    ax1.set_ylabel(f"b2 = ({B[0,1]:.2f}, {B[1,1]:.2f})")
+
+    
+    max_sg = absSG.max()
+    colors = [(1.,0.,0.,v) for v in np.maximum(absSG.reshape(-1) / max_sg, 0.1)]
+    ax2.scatter(G[0,:], G[1,:], c=colors)
+    if L and N:   
+        e = 2*np.pi/L * N / 2
+        ticks = np.arange(-e, e, 2*np.pi/L)
+        plt.xticks(ticks, rotation=90)
+        ax2.set_yticks(ticks)
+        ax2.set_xlim((-e,e))
+        ax2.set_ylim((-e,e))
+        ax2.set_aspect('equal')
+        ax2.title.set_text(f"L = {L} Å, N = {N}")
+        ax2.grid(True)
+    else:
+        if xlims:
+            ax2.set_xlim(xlims)
+        if ylims:
+            ax2.set_ylim(ylims)
+    
+    plt.show()
+
+    
+from mpl_toolkits.mplot3d import Axes3D   
 def plot_3D_reciprocal_lattice(B, G, SG, xlims=None, ylims=None, zlims=None, L=None, N=None):
+    """
+    three dimensional pendant of plot_2D_reciprocal_lattice
+    """
+    
     absSG = np.abs(SG)
         
     fig = plt.figure(figsize=(4,4))
     ax = Axes3D(fig)
     
     max_sg = absSG.max()
-    colors = [(1.,0.,0.,v) for v in absSG.reshape(-1) / max_sg]
-    ax.scatter(G[0,:], G[1,:], G[2,:], c=colors)
-    if xlims:
-        ax.set_xlim(xlims)
-    if ylims:
-        ax.set_ylim(ylims)
-    if zlims:
-        ax.set_zlim(zlims)
+    colors = [(1.,0.,0.,v) for v in np.maximum(absSG.reshape(-1) / max_sg, 0.1)]
     
+    if L and N:   
+        e = 2*np.pi/L * N / 2
+        ax.set_xlim((-e,e))
+        ax.set_ylim((-e,e))
+        ax.set_zlim((-e,e))
+        plt.suptitle(f"L = {L} Å, N = {N}")
+        plt.grid(True)
+        
+        for i in range(len(colors)):
+            if not np.all((-e <= G[:,i]) & (G[:,i] <= e)):
+                colors[i] = (0.,0.,0.,0.)
+    else:         
+        if xlims:
+            ax.set_xlim(xlims)
+        if ylims:
+            ax.set_ylim(ylims)
+        if zlims:
+            ax.set_zlim(zlims)
+    
+    ax.scatter(G[0,:], G[1,:], G[2,:], c=colors)
     
     plt.show()
+
+
+def get_mesh_coords(A, L, N):
+    """
+    Find integer ranges M = [mx1, mx2] x [my1, my2] ( x [mz1, mz2])
+    such that G = B . M contains all points that fall into [-2pi/delta_L / 2, 2pi/delta_L / 2]^d
+    where delta_L = L/N and N is the number of voxels along each axis
+    """
+    d = A.shape[0]
+    delta_L = L / N
+
+    # find inverse of B (= 1/2pi A.T) at corner points of the cube [-2pi/delta_L, 2pi/delta_L]^d
+    extreme_point = np.full((d,), 1/(2*delta_L))
+    
+    if d == 2:
+        extreme_points = np.array([[1,1], [-1,1], [1,-1], [-1,-1]]) * extreme_point # (4,2)
+        r_extreme_points = A.T.dot(extreme_points.T) # (2,4)
+
+        lower = np.min(np.floor(r_extreme_points), axis=1)
+        upper = np.max(np.ceil(r_extreme_points), axis=1)+1
+
+        return np.arange(lower[0], upper[0]), np.arange(lower[1], upper[1])
+    if d == 3:
+        extreme_points = np.array([[1,1,1], [-1,1,1], [1,-1,1], [1,1,-1],
+                                   [-1,-1,-1], [1,-1,-1], [-1,1,-1],[-1,-1,1]]) * extreme_point # (8,3)
+        r_extreme_points = A.T.dot(extreme_points.T) # (3,8)
+
+        lower = np.min(np.floor(r_extreme_points), axis=1)
+        upper = np.max(np.ceil(r_extreme_points), axis=1)+1
+
+        return np.arange(lower[0], upper[0]), np.arange(lower[1], upper[1]), np.arange(lower[2], upper[2])
+    
+
+def adapt_to_voxel_grid(G, SG, L, N):
+    """
+    Discretise the evaluations of the field over the reciprocal space
+    in the cube [-pi/L*N, pi/L*N]^d = [-pi/delta_L, pi/delta_L]^d
+    where delta_L = L/N and N is the number of voxels along each axis
+    
+    This transforming G linearly such that [-pi/delta_L, pi/delta_L]^d is mapped to [0, N]^d.
+    Then it the resulting vectors are rounded down to form the final grid.
+    """
+    
+    d, n = G.shape
+    absSG = np.abs(SG)
+    voxel_width = 2*np.pi / L
+    grid_width = voxel_width * N # = 2*pi/delta_L
+    
+    grid_shape = (0,)
+    if d == 2:
+        grid_shape = (N,N)
+    if d == 3:
+        grid_shape = (N,N,N)
+        
+    grid = np.zeros(grid_shape)
+    
+    for i in range(n):
+        g = G[:,i]
+        index = np.floor((g + grid_width/2) / voxel_width).astype(np.int)
+        if np.all(0 <= index) and np.all(index < N):
+            if d == 2:
+                grid[index[1], index[0]] += absSG[i] # rows = y-axis, cols = x-axis
+            if d == 3:
+                grid[index[1], index[0], index[2]] += absSG[i]
+
+    return grid
