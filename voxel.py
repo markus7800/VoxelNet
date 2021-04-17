@@ -420,17 +420,15 @@ def plot_3D_reciprocal_lattice(B, G, SG, xlims=None, ylims=None, zlims=None, L=N
     plt.show()
 
 
-def get_mesh_coords(A, L, N):
+def get_mesh_coords(A, width):
     """
     Find integer ranges M = [mx1, mx2] x [my1, my2] ( x [mz1, mz2])
-    such that G = B . M contains all points that fall into [-2pi/delta_L / 2, 2pi/delta_L / 2]^d
-    where delta_L = L/N and N is the number of voxels along each axis
+    such that G = B . M contains all points that fall into [-width / 2, width / 2]^d
     """
     d = A.shape[0]
-    delta_L = L / N
 
-    # find inverse of B (= 1/2pi A.T) at corner points of the cube [-2pi/delta_L, 2pi/delta_L]^d
-    extreme_point = np.full((d,), 1/(2*delta_L))
+    # find inverse of B (= 1/2pi A.T) at corner points of the cube [-width / 2, width / 2]^d
+    extreme_point = np.full((d,), width/(2 * 2*np.pi))
     
     if d == 2:
         extreme_points = np.array([[1,1], [-1,1], [1,-1], [-1,-1]]) * extreme_point # (4,2)
@@ -451,7 +449,7 @@ def get_mesh_coords(A, L, N):
         return np.arange(lower[0], upper[0]), np.arange(lower[1], upper[1]), np.arange(lower[2], upper[2])
     
 
-def adapt_to_voxel_grid(G, SG, L, N):
+def adapt_to_voxel_grid(G, SG, L, N, rot=None):
     """
     Discretise the evaluations of the field over the reciprocal space
     in the cube [-pi/L*N, pi/L*N]^d = [-pi/delta_L, pi/delta_L]^d
@@ -466,6 +464,9 @@ def adapt_to_voxel_grid(G, SG, L, N):
     voxel_width = 2*np.pi / L
     grid_width = voxel_width * N # = 2*pi/delta_L
     
+    if rot is None:
+        rot = np.eye(d) # no rotation
+    
     grid_shape = (0,)
     if d == 2:
         grid_shape = (N,N)
@@ -475,7 +476,7 @@ def adapt_to_voxel_grid(G, SG, L, N):
     grid = np.zeros(grid_shape)
     
     for i in range(n):
-        g = G[:,i]
+        g = rot.dot(G[:,i])
         index = np.floor((g + grid_width/2) / voxel_width).astype(np.int)
         if np.all(0 <= index) and np.all(index < N):
             if d == 2:
@@ -484,3 +485,19 @@ def adapt_to_voxel_grid(G, SG, L, N):
                 grid[index[1], index[0], index[2]] += absSG[i]
 
     return grid
+
+
+def get_2D_rotation_matrix(theta):
+    c = np.cos(theta)
+    s = np.sin(theta)
+    return np.array([
+        [c, -s],
+        [s, c]
+    ])
+
+def get_random_2D_rotation_matrix():
+    get_2D_rotation_matrix(2*np.pi*np.random.rand())
+
+from scipy.spatial.transform import Rotation
+def get_random_3D_rotation_matrix():
+    return Rotation.random().as_matrix()
