@@ -475,8 +475,9 @@ def adapt_to_voxel_grid(G, SG, L, N, rot=None):
         
     grid = np.zeros(grid_shape)
     
+    RG = rot.dot(G)
     for i in range(n):
-        g = rot.dot(G[:,i])
+        g = RG[:,i]
         index = np.floor((g + grid_width/2) / voxel_width).astype(np.int)
         if np.all(0 <= index) and np.all(index < N):
             if d == 2:
