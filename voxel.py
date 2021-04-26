@@ -476,14 +476,20 @@ def adapt_to_voxel_grid(G, SG, L, N, rot=None):
     grid = np.zeros(grid_shape)
     
     RG = rot.dot(G)
-    for i in range(n):
-        g = RG[:,i]
-        index = np.floor((g + grid_width/2) / voxel_width).astype(np.int)
-        if np.all(0 <= index) and np.all(index < N):
-            if d == 2:
-                grid[index[1], index[0]] += absSG[i] # rows = y-axis, cols = x-axis
-            if d == 3:
-                grid[index[1], index[0], index[2]] += absSG[i]
+    
+    I = np.floor((RG + grid_width/2) / voxel_width).astype(np.int)
+    
+    
+    in_grid = np.all((0 <= I) & (I < N), axis=0)
+    I = I[:,in_grid]
+    absSG = absSG[in_grid]
+    
+    for i in range(I.shape[1]):
+        index = I[:,i]
+        if d == 2:
+            grid[index[1], index[0]] += absSG[i] # rows = y-axis, cols = x-axis
+        if d == 3:
+            grid[index[1], index[0], index[2]] += absSG[i]
 
     return grid
 
