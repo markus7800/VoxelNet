@@ -87,7 +87,40 @@ def show_molecule(mol, calc_coords=True):
     view.background="black"
     display(view)
     
+
+def elements_coords(entry, augment=True):
+    elements = []
+    for e, n in zip(entry.species, entry.composition):
+        elements = elements + [e]*n
+        
+        
+    pfs_list = list(entry.positions_fractional)
     
+    if augment:
+        for element, coords in zip(elements, pfs_list):
+            for i, c in enumerate(coords):
+                if c == 0:
+                    new_coords = coords.copy()
+                    new_coords[i] = 1.
+
+                    already_in = False
+                    for other_p in pfs_list:
+                        if all(other_p == new_coords):
+                            already_in = True
+                            break
+
+                    if not already_in:
+                        pfs_list.append(new_coords)
+                        elements.append(element)
+    
+    pfs = np.array(pfs_list)
+    
+    A = calc_basis(entry.geometry)
+    cartesian_coords = calc_cartesian_positions(A, pfs)
+    
+    return elements, cartesian_coords
+    
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 def plot_3D_crystal(mol):
     A = calc_basis(mol.geometry)
@@ -98,16 +131,14 @@ def plot_3D_crystal(mol):
     colors = ["red", "green", "blue", "orange", "purple", "black"]
 
 
-    elements, coords = elements_coords(r, augment=True)
+    elements, coords = elements_coords(mol, augment=True)
 
 
 
     color_dict = {}
-    for i, element in enumerate(r.species):
+    for i, element in enumerate(mol.species):
         color_dict[element] = colors[i]
 
-
-    print(color_dict)
 
     cs = []
     for element in elements:
@@ -135,11 +166,11 @@ def plot_3D_crystal(mol):
         ax.plot([0, A[0,i]], [0,A[1,i]], [0,A[2,i]])
 
     legend_handels = []
-    for i, n in enumerate(r.composition):
+    for i, n in enumerate(mol.composition):
         legend_element = plt.Line2D([0], [0], marker='o', color="w",
-                                    markerfacecolor= colors[i], label=r.species[i], markersize=10)
+                                    markerfacecolor = colors[i], label=mol.species[i], markersize=10)
         legend_handels.append(legend_element)
 
-    plt.suptitle(r.compound)
+    plt.suptitle(mol.compound)
     ax.legend(handles=legend_handels)
     plt.show()
