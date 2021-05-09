@@ -449,7 +449,7 @@ def get_mesh_coords(A, width):
         return np.arange(lower[0], upper[0]), np.arange(lower[1], upper[1]), np.arange(lower[2], upper[2])
     
 
-def adapt_to_voxel_grid(G, SG, L, N, rot=None):
+def make_voxel_grid(G, SG, L, N, rot=None):
     """
     Discretise the evaluations of the field over the reciprocal space
     in the cube [-pi/L*N, pi/L*N]^d = [-pi/delta_L, pi/delta_L]^d
@@ -493,6 +493,83 @@ def adapt_to_voxel_grid(G, SG, L, N, rot=None):
 
     return grid
 
+def cartisan_2D_to_spherical(X):
+    r = np.linalg.norm(X, axis=0)
+    theta = np.apply_along_axis(lambda x: np.arctan2(x[1],x[0]), 0, X)
+    return np.vstack((r, theta))
+
+def cartisan_3D_to_spherical(xyz):
+    pts = np.zeros(xyz.shape)
+    xy = xyz[0,:]**2 + xyz[1,:]**2
+    pts[0,:] = np.sqrt(xy + xyz[2,:]**2)
+    pts[1,:] = np.arctan2(np.sqrt(xy), xyz[2,:]) # for elevation angle defined from Z-axis down
+    #pts[1,:] = np.arctan2(xyz[:,2], np.sqrt(xy)) # for elevation angle defined from XY-plane up
+    pts[2,:] = np.arctan2(xyz[1,:], xyz[0,:])
+    return pts
+
+def make_spherical_voxel_grid(G, SG, L, N, rot=None):
+    """
+    Discretise the evaluations of the field over the reciprocal space
+    in the circle around origin with radius pi/L * N * sqrt(d) =  pi/delta_L * sqrt(d)
+    where delta_L = L/N and N is the number of voxels along each axis
+    
+    Thus transforming G linearly such that its spherical coordinates are mapped to [0, N]^d.
+    Then it the resulting vectors are rounded down to form the final grid.
+    """
+    
+    d, n = G.shape
+    absSG = np.abs(SG)
+    voxel_width = np.pi / L * np.sqrt(d)
+    radius = voxel_width * N # = 2*pi/delta_L * sqrt(d)
+    
+    if rot is None:
+        rot = np.eye(d) # no rotation
+    
+    RG = rot.dot(G)
+    
+    grid_shape = (0,)
+    if d == 2:
+        grid_shape = (N,N)
+        
+        RG_spherical = cartisan_2D_to_spherical(RG)
+        
+        r = RG_spherical[0,:] # in [0, infty]
+        phi = RG_spherical[1,:] # in [-pi, pi]
+
+        I = np.floor(np.vstack((
+            r / voxel_width,
+            (phi + np.pi) / (2*np.pi/N)
+        ))).astype(np.int)
+    if d == 3:
+        grid_shape = (N,N,N)
+        
+        RG_spherical = cartisan_3D_to_spherical(RG)
+        
+        r = RG_spherical[0,:] # in [0, infty]
+        theta = RG_spherical[1,:] # in [0, pi]
+        phi = RG_spherical[2,:] # in [-pi, pi]
+
+        I = np.floor(np.vstack((
+            r / voxel_width,
+            theta / (np.pi/N),
+            (phi + np.pi) / (2*np.pi/N)
+        ))).astype(np.int)
+    
+    
+    grid = np.zeros(grid_shape)
+
+    in_grid = np.all((0 <= I) & (I < N), axis=0)
+    I = I[:,in_grid]
+    absSG = absSG[in_grid]
+    
+    for i in range(I.shape[1]):
+        index = I[:,i]
+        if d == 2:
+            grid[index[0], index[1]] += absSG[i] # rows = y-axis, cols = x-axis
+        if d == 3:
+            grid[index[0], index[1], index[2]] += absSG[i]
+
+    return grid
 
 def get_2D_rotation_matrix(theta):
     c = np.cos(theta)
