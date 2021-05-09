@@ -115,6 +115,13 @@ class MolLoader(object):
 
     def __len__(self):
         return int(np.ceil(self.N_data / self.batch_size))
+    
+    def reset(self, batch_size, shuffle, rotate_randomly):
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.rotate_randomly = rotate_randomly
+        self.current = 0
+        self.indices = np.arange(len(self.ys))
 
     def next(self):
         N_data = self.N_data
