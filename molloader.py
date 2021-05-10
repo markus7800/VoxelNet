@@ -124,20 +124,15 @@ class MolLoader(object):
         self.indices = np.arange(len(self.ys))
 
     def next(self):
-        N_data = self.N_data
-        N = self.N # number of voxels
-        L = self.L
-        nchan = self.nchannel
-        
         if self.current == 0 and self.shuffle:
             np.random.shuffle(self.indices)
         
-        if self.current < N_data:
+        if self.current < self.N_data:
             n1 = self.current
-            n2 = min(self.current + self.batch_size, N_data)
+            n2 = min(self.current + self.batch_size, self.N_data)
             
             x_names = []
-            x = np.zeros((n2-n1, nchan, N, N, N), dtype="float32")
+            x = np.zeros((n2-n1, self.nchannel, self.N, self.N, self.N), dtype="float32")
             y = np.zeros((n2-n1,1), dtype="float32")
             
             for i, j in enumerate(range(n1, n2)):
@@ -150,13 +145,13 @@ class MolLoader(object):
                 if self.rotate_randomly:
                     R = get_random_3D_rotation_matrix()
                 
-                if nchan == 1:
+                if self.nchannel == 1:
                     G, SG = self.reciprocal_data[data_index]
-                    descriptor = make_voxel_grid(G, SG, L, N, rot=R)
+                    descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
                     x[i, 0, :, :, :] = descriptor
                 else:
                     for j, element, (G, SG) in self.reciprocal_data[data_index]:
-                        descriptor = make_voxel_grid(G, SG, L, N, rot=R)
+                        descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
                         x[i, j, :, :, :] = descriptor
                                            
             
@@ -171,6 +166,8 @@ class MolLoader(object):
         # print("Stop Iteration")
         raise StopIteration()
 
+        
+        
 class LazyMolLoader(object):
     def __init__(self, df, sigma, L, N, batch_size, elements = None, nchannel=1,
                  shuffle=False, rotate_randomly=False, device=torch.device('cpu')):
@@ -207,21 +204,16 @@ class LazyMolLoader(object):
         return int(np.ceil(self.N_data / self.batch_size))
 
     def next(self):
-        N_data = self.N_data
-        N = self.N # number of voxels
-        L = self.L
-        sigma = self.sigma
-        nchan = self.nchannel
         
         if self.current == 0 and self.shuffle:
             np.random.shuffle(self.indices)
         
-        if self.current < N_data:
+        if self.current < self.N_data:
             n1 = self.current
-            n2 = min(self.current + self.batch_size, N_data)
+            n2 = min(self.current + self.batch_size, self.N_data)
             
             x_names = []
-            x = np.zeros((n2-n1, nchan, N, N, N), dtype="float32")
+            x = np.zeros((n2-n1, self.nchannel, self.N, self.N, self.N), dtype="float32")
             y = np.zeros((n2-n1,1), dtype="float32")
             
             for i, j in enumerate(range(n1, n2)):
@@ -233,18 +225,18 @@ class LazyMolLoader(object):
                 if self.rotate_randomly:
                     R = get_random_3D_rotation_matrix()
                 
-                if nchan == 1:
-                    name, rd, y_i = single_channel_reciprocal_data(mol, sigma, L, N)
+                if self.nchannel == 1:
+                    name, rd, y_i = single_channel_reciprocal_data(mol, self.sigma, self.L, self.N)
                     G, SG = rd
-                    descriptor = make_voxel_grid(G, SG, L, N, rot=R)
+                    descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
                     x[i, 0, :, :, :] = descriptor
                     y[i] = y_i
                     x_names.append(name)
                 
                 else:
-                    name, rd, y_i = multi_channel_reciprocal_data(mol, sigma, L, N, self.elements)
+                    name, rd, y_i = multi_channel_reciprocal_data(mol, self.sigma, self.L, self.N, self.elements)
                     for j, element, (G, SG) in rd:
-                        descriptor = make_voxel_grid(G, SG, L, N, rot=R)
+                        descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
                         x[i, j, :, :, :] = descriptor
                     y[i] = y_i
                     x_names.append(name)

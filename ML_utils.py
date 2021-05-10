@@ -104,9 +104,8 @@ def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=
             ys.append(y.cpu().numpy())
             y_hats.append(y_hat.cpu().detach().numpy())
             
-            if verbose:
-                counter += 1
-                print(f"Epoch {epoch}: Batch {counter}/{total} processed.      ", end="\r")
+            counter += 1
+            print(f"Epoch {epoch}: Batch {counter}/{total} processed.      ", end="\r")
             
         ys = np.vstack(ys).reshape(-1)
         y_hats = np.vstack(y_hats).reshape(-1)
@@ -125,7 +124,7 @@ def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=
         
     t1 = time.time()
     
-    print(f"Finished in {t1-t0:.4f}s.")
+    print(f"Finished in {t1-t0:.4f}s.                               ")
 
     plt.plot(train_mse, label="train")
     plt.plot(val_mse, label="validation")
