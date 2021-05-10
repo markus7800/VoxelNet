@@ -109,8 +109,8 @@ class MolLoader(object):
         self.indices = np.arange(len(ys))
         self.N_data = len(self.indices)
         
-        print(f"Initialised MolLoader with {self.N_data} compounds."
-        print(f"\tsigma = {sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, shuffle={self.shuffle}, rotate={self.rotate_randomly}, device={self.device}")
+        print(f"Initialised MolLoader with {self.N_data} compounds.")
+        print(f"    sigma={sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, shuffle={self.shuffle}, rotate={self.rotate_randomly}, device={self.device}")
         
     def __iter__(self):
         return self
