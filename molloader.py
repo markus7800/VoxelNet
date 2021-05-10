@@ -72,14 +72,14 @@ def prepare_multi_channel_data(df, sigma, L, N, elements, reduce_data=True):
         ys.append(y)
         
         counter += 1
-        print(f"Calculated {counter}/{total} molecules.      ", end="\r")
+        print(f"Calculated {counter}/{total} compounds.      ", end="\r")
         
     return names, reciprocal_data, ys
 
 
 class MolLoader(object):
     def __init__(self, df, sigma, L, N, batch_size, nchannel=1, elements=None,
-                 shuffle=False, rotate_randomly=False, device=torch.device('cpu'), reduce_data=True):
+                 shuffle=False, rotate_randomly=False, device=torch.device('cpu'), reduce_data=True, mode='cartesian'):
         
         if elements is None:
             names, reciprocal_data, ys = prepare_single_channel_data(df, sigma=sigma, L=L, N=N)
@@ -95,6 +95,10 @@ class MolLoader(object):
         self.batch_size = batch_size
         self.rotate_randomly = rotate_randomly
         self.device = device
+        self.mode = mode
+        
+        if self.mode != 'cartesian' and self.mode != 'spherical':
+            raise ValueError(f"{self.mode} must be either cartesian or spherical")
         
         self.L = L
         self.N = N
@@ -105,7 +109,8 @@ class MolLoader(object):
         self.indices = np.arange(len(ys))
         self.N_data = len(self.indices)
         
-        print(f"Initialised MolLoader with {self.N_data} molecules. sigma = {sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, shuffle={self.shuffle}, rotate={self.rotate_randomly}, device={self.device}")
+        print(f"Initialised MolLoader with {self.N_data} compounds."
+        print(f"\tsigma = {sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, shuffle={self.shuffle}, rotate={self.rotate_randomly}, device={self.device}")
         
     def __iter__(self):
         return self
@@ -147,11 +152,17 @@ class MolLoader(object):
                 
                 if self.nchannel == 1:
                     G, SG = self.reciprocal_data[data_index]
-                    descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
+                    if self.mode == 'cartesian':
+                        descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
+                    elif self.mode == 'spherical':
+                        descriptor = make_spherical_voxel_grid(G, SG, self.L, self.N, rot=R)
                     x[i, 0, :, :, :] = descriptor
                 else:
                     for j, element, (G, SG) in self.reciprocal_data[data_index]:
-                        descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
+                        if self.mode == 'cartesian':
+                            descriptor = make_voxel_grid(G, SG, self.L, self.N, rot=R)
+                        elif self.mode == 'spherical':
+                            descriptor = make_spherical_voxel_grid(G, SG, self.L, self.N, rot=R)
                         x[i, j, :, :, :] = descriptor
                                            
             
