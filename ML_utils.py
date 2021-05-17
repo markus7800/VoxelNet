@@ -72,7 +72,6 @@ def plot_predictions(ys, y_hats, alpha=0.2):
     
     plt.plot([l,u], [l,u], c="red")
     plt.suptitle(f"MSE = {mse:.4f}")
-    plt.show()
     
     
 def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=True):
@@ -101,7 +100,7 @@ def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=
             optimizer.step()
             optimizer.zero_grad()
             
-            ys.append(y.cpu().numpy())
+            ys.append(y.cpu().detach().numpy())
             y_hats.append(y_hat.cpu().detach().numpy())
             
             counter += 1
