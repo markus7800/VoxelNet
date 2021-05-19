@@ -4,31 +4,36 @@ from mol_tools import *
 
 import torch
 
-def single_channel_reciprocal_data(mol, sigma, L, N):
+def single_channel_reciprocal_data(mol, sigma, L, N, per_atom):
     width = 2 * np.pi / L * N
     adj_width = width*np.sqrt(3)
     A = calc_basis(mol.geometry)
     coords = calc_cartesian_positions(A, mol.positions_fractional)
     mx, my, mz = get_mesh_coords(A, adj_width)
     B, G, SG = reciprocal_lattice_gaussian(A, coords, sigma, mx, my, mz)
-    return mol.compound, (G, SG), mol.enthalpy_atom
     
-def prepare_single_channel_data(df, sigma, L, N):
+    y = mol.enthalpy_atom
+    if not per_atom:
+        y = y * mol.natoms
+    
+    return mol.compound, (G, SG), y
+    
+def prepare_single_channel_data(df, sigma, L, N, per_atom):
     
     names = []
     reciprocal_data = []
     ys = []
     for index, mol in df.iterrows():
-        name, rd, y = single_channel_reciprocal_data(mol, sigma, L, N)
+        name, rd, y = single_channel_reciprocal_data(mol, sigma, L, N, per_atom)
 
         names.append(name)
         reciprocal_data.append(rd)
         ys.append(y)
-                    
+                   
     return names, reciprocal_data, ys
         
 
-def multi_channel_reciprocal_data(mol, sigma, L, N, elements, reduce_data=True):
+def multi_channel_reciprocal_data(mol, sigma, L, N, elements, per_atom, reduce_data=True):
     width = 2 * np.pi / L * N
     adj_width = width*np.sqrt(3)
     
@@ -54,10 +59,14 @@ def multi_channel_reciprocal_data(mol, sigma, L, N, elements, reduce_data=True):
         j = np.where(elements == element)[0][0] # get channel for element
         rd.append((j, element, (G, SG)))
         
-    return mol.compound, rd, mol.enthalpy_atom
+    y = mol.enthalpy_atom
+    if not per_atom:
+        y = y * mol.natoms
+    
+    return mol.compound, rd, y
 
 
-def prepare_multi_channel_data(df, sigma, L, N, elements, reduce_data=True):
+def prepare_multi_channel_data(df, sigma, L, N, elements, per_atom, reduce_data=True):
     names = []
     reciprocal_data = []
     ys = []
@@ -65,7 +74,7 @@ def prepare_multi_channel_data(df, sigma, L, N, elements, reduce_data=True):
     total = df.shape[0]
     
     for index, mol in df.iterrows():
-        name, rd, y = multi_channel_reciprocal_data(mol, sigma, L, N, elements, reduce_data)
+        name, rd, y = multi_channel_reciprocal_data(mol, sigma, L, N, elements, per_atom, reduce_data)
         
         names.append(name)
         reciprocal_data.append(rd)
@@ -79,12 +88,13 @@ def prepare_multi_channel_data(df, sigma, L, N, elements, reduce_data=True):
 
 class MolLoader(object):
     def __init__(self, df, sigma, L, N, batch_size, nchannel=1, elements=None,
-                 shuffle=False, rotate_randomly=False, device=torch.device('cpu'), reduce_data=True, mode='cartesian'):
+                 shuffle=False, rotate_randomly=False, reflect_randomly=False,
+                 device=torch.device('cpu'), reduce_data=True, per_atom=True, mode='cartesian'):
         
         if elements is None:
-            names, reciprocal_data, ys = prepare_single_channel_data(df, sigma=sigma, L=L, N=N)
+            names, reciprocal_data, ys = prepare_single_channel_data(df, sigma=sigma, L=L, N=N, per_atom=per_atom)
         else:
-            names, reciprocal_data, ys = prepare_multi_channel_data(df, sigma=sigma, L=L, N=N,
+            names, reciprocal_data, ys = prepare_multi_channel_data(df, sigma=sigma, L=L, N=N, per_atom=per_atom,
                                                                     elements=elements, reduce_data=reduce_data)
             nchannel = len(elements)
 
@@ -94,6 +104,7 @@ class MolLoader(object):
         self.ys = ys
         self.batch_size = batch_size
         self.rotate_randomly = rotate_randomly
+        self.reflect_randomly = reflect_randomly
         self.device = device
         self.mode = mode
         
@@ -110,7 +121,8 @@ class MolLoader(object):
         self.N_data = len(self.indices)
         
         print(f"Initialised MolLoader with {self.N_data} compounds.")
-        print(f"    sigma={sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, shuffle={self.shuffle}, rotate={self.rotate_randomly}, device={self.device}")
+        print(f"    sigma={sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, device={self.device}")
+        print(f"    shuffle={self.shuffle}, rotate={self.rotate_randomly}, reflect={self.reflect_randomly}")
         
     def __iter__(self):
         return self
@@ -121,10 +133,11 @@ class MolLoader(object):
     def __len__(self):
         return int(np.ceil(self.N_data / self.batch_size))
     
-    def reset(self, batch_size, shuffle, rotate_randomly):
+    def reset(self, batch_size, shuffle, rotate_randomly, reflect_randomly):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.rotate_randomly = rotate_randomly
+        self.reflect_randomly = reflect_randomly
         self.current = 0
         self.indices = np.arange(len(self.ys))
 
@@ -149,6 +162,9 @@ class MolLoader(object):
                 R = np.eye(3)
                 if self.rotate_randomly:
                     R = get_random_3D_rotation_matrix()
+                if self.reflect_randomly:
+                    if np.random.rand() < 0.5:
+                        R = -R
                 
                 if self.nchannel == 1:
                     G, SG = self.reciprocal_data[data_index]

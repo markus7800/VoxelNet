@@ -128,4 +128,5 @@ def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=
     plt.plot(train_mse, label="train")
     plt.plot(val_mse, label="validation")
     plt.legend()
+    plt.savefig("acc_train_val_temp.pdf")
     plt.show()
