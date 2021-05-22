@@ -1,26 +1,32 @@
 import numpy as np
-def get_element_list(mol):
-    elements = []
-    for e, n in zip(mol.species, mol.composition):
-        elements = elements + [e]*n
-    return elements
+from mol_tools import *
 
-import ase
-import nglview
-def show_molecule(mol, calc_coords=True):
-    A = calc_basis(mol.geometry)
-    if calc_coords:
-        coords = calc_cartesian_positions(A, mol.positions_fractional)
-    else:
-        coords = mol.positions_cartesian
-        
-    elements = get_element_list(mol)
-    ase_mol = ase.Atoms(symbols=elements, positions=coords, pbc=False, cell=A)
-    view = nglview.show_ase(ase_mol)
-    view.background="black"
-    display(view)
+
+# ase, nglview
+
+#def get_element_list(mol):
+#    elements = []
+#    for e, n in zip(mol.species, mol.composition):
+#        elements = elements + [e]*n
+#    return elements
+
+#import ase
+#import nglview
+#def show_molecule(mol, calc_coords=True):
+#    A = calc_basis(mol.geometry)
+#    if calc_coords:
+#        coords = calc_cartesian_positions(A, mol.positions_fractional)
+#    else:
+#        coords = mol.positions_cartesian
+#        
+#    elements = get_element_list(mol)
+#    ase_mol = ase.Atoms(symbols=elements, positions=coords, pbc=False, cell=A)
+#    view = nglview.show_ase(ase_mol)
+#    view.background="black"
+#    display(view)
     
 
+# custom plot
 def elements_coords(entry, augment=True):
     elements = []
     for e, n in zip(entry.species, entry.composition):
