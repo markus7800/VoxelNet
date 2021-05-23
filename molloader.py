@@ -53,8 +53,8 @@ def multi_channel_reciprocal_data(mol, sigma, L, N, elements, per_atom, reduce_d
         if reduce_data:
             # only keep data that lies in relevant circle
             in_grid = np.linalg.norm(G,axis=0) <= adj_width/2 + 2*width/N # add 2 times voxel width to be sure (rounding)
-            G = G[:,in_grid]
-            SG = np.abs(SG[in_grid]) # also convert complex to real here to half the size
+            G = G[:,in_grid].astype(np.float32)
+            SG = np.abs(SG[in_grid]).astype(np.float32) # also convert complex to real here to half the size
             
         j = np.where(elements == element)[0][0] # get channel for element
         rd.append((j, element, (G, SG)))
