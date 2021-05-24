@@ -7,6 +7,7 @@ from mol_tools import *
 import torch
 import torch.nn as nn
 import random
+import copy
 
 
 def seed_everything(seed=0):
@@ -48,11 +49,11 @@ def predict(model, loader):
     y_hats = np.vstack(y_hats).reshape(-1)
     return ys, y_hats
 
-def predict_epochs(net, ml, epochs=1):
+def predict_epochs(model, ml, epochs=1):
     ys = []
     y_hats = []
     for epoch in range(epochs): # for random rotations
-        y, y_hat = predict(net, ml)
+        y, y_hat = predict(model, ml)
         ys.append(y)
         y_hats.append(y_hat)
     
@@ -62,6 +63,10 @@ def predict_epochs(net, ml, epochs=1):
     return ys, y_hats
 
 def plot_predictions(ys, y_hats, alpha=0.2):
+    
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_aspect('equal')
+
     mse = np.mean((ys - y_hats)**2)
     plt.scatter(ys, y_hats, alpha=alpha)
     plt.xlabel("measured")
@@ -73,16 +78,20 @@ def plot_predictions(ys, y_hats, alpha=0.2):
     plt.plot([l,u], [l,u], c="red")
     plt.suptitle(f"MSE = {mse:.4f}")
     
-    
-def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=True):
+def fit(epochs, model, train_loader, val_loader, test_loader, opt, lr, weight_decay, verbose=True, val_epochs=1):
     t0 = time.time()
     
     optimizer = opt(model.parameters(), lr=lr, weight_decay=weight_decay)
+    print(f"opt: {optimizer}, number of epochs: {epochs}, validation epochs: {val_epochs}")
     
     loss = nn.MSELoss()
     
     train_mse = []
     val_mse = []
+    test_mse = []
+    
+    best_loss = np.inf
+    best_model = copy.deepcopy(model)
     
     for epoch in range(epochs):
         ys = []
@@ -112,21 +121,43 @@ def fit(epochs, model, train_loader, val_loader, opt, lr, weight_decay, verbose=
         train_mse.append(mean_loss)
         
         model.eval()
-        ys_val, y_hats_val = predict(model, val_loader)
+        print(f"Epoch {epoch}: Evaluate on validation set.                  ", end="\r")
+        ys_val, y_hats_val = predict_epochs(model, val_loader, epochs=val_epochs)
         mean_loss_val = np.mean((ys_val - y_hats_val)**2)
         val_mse.append(mean_loss_val)
         
+        print(f"Epoch {epoch}: Evaluate on test set.                        ", end="\r")
+        ys_test, y_hats_test = predict_epochs(model, test_loader, epochs=val_epochs)
+        mean_loss_test = np.mean((ys_test - y_hats_test)**2)
+        test_mse.append(mean_loss_test)
+        
         if verbose:
-            print(f"Epoch {epoch}: train loss {mean_loss} val loss {mean_loss_val}")
+            print(f"Epoch {epoch}: train loss {mean_loss:.4f} val loss {mean_loss_val:.4f} test loss {mean_loss_test:.4f}", end=" ")
     
+        if mean_loss_val < best_loss:
+            best_model = copy.deepcopy(model)
+            best_loss = mean_loss_val
+            if verbose:
+                print("-> best val loss!")
+        else:
+            if verbose:
+                print("")
     
         
     t1 = time.time()
     
     print(f"Finished in {t1-t0:.4f}s.                               ")
 
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_aspect('equal')
     plt.plot(train_mse, label="train")
     plt.plot(val_mse, label="validation")
+    plt.plot(test_mse, label="test")
+    plt.yscale("log")
+    plt.ylabel("MSE")
+    plt.xlabel("epoch")
     plt.legend()
     plt.savefig("acc_train_val_temp.pdf")
     plt.show()
+    
+    return best_model

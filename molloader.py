@@ -98,7 +98,7 @@ def multi_channel_reciprocal_data(mol, sigma, L, N, elements, per_atom, reduce_d
     return mol.compound, rd, y
 
 
-def multi_channel_reciprocal_data(df, sigma, L, N, elements, per_atom, reduce_data=True):
+def prepare_multi_channel_data(df, sigma, L, N, elements, per_atom, reduce_data=True):
     """
     Computes reciprocal vectors and coefficents for all rows (compounds) of the dataframe df.
     For more details see single_channel_reciprocal_data.
@@ -154,14 +154,14 @@ class MolLoader(object):
     """
     def __init__(self, df, sigma, L, N, batch_size, nchannel=1, elements=None,
                  shuffle=False, rotate_randomly=False, reflect_randomly=False,
-                 device=torch.device('cpu'), reduce_data=True, per_atom=True, mode='cartesian'):
+                 device=torch.device('cpu'), per_atom=True, mode='cartesian'):
         
         # prepare/precompute reciprocal data
         if elements is None:
             names, reciprocal_data, ys = prepare_single_channel_data(df, sigma=sigma, L=L, N=N, per_atom=per_atom)
         else:
             names, reciprocal_data, ys = prepare_multi_channel_data(df, sigma=sigma, L=L, N=N, per_atom=per_atom,
-                                                                    elements=elements, reduce_data=reduce_data)
+                                                                    elements=elements, reduce_data=True)
             nchannel = len(elements)
 
         
@@ -189,7 +189,7 @@ class MolLoader(object):
         
         print(f"Initialised MolLoader with {self.N_data} compounds.")
         print(f"    sigma={sigma}, L={self.L}, N={self.N}, nchannel={self.nchannel}, mode={self.mode}, device={self.device}")
-        print(f"    shuffle={self.shuffle}, rotate={self.rotate_randomly}, reflect={self.reflect_randomly}")
+        print(f"    shuffle={self.shuffle}, rotate={self.rotate_randomly}, reflect={self.reflect_randomly}, mode={self.mode}")
         
     def __iter__(self):
         return self
