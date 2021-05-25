@@ -149,7 +149,6 @@ def fit(epochs, model, train_loader, val_loader, test_loader, opt, lr, weight_de
     print(f"Finished in {t1-t0:.4f}s.                               ")
 
     fig, ax = plt.subplots(figsize=(5,5))
-    ax.set_aspect('equal')
     plt.plot(train_mse, label="train")
     plt.plot(val_mse, label="validation")
     plt.plot(test_mse, label="test")
