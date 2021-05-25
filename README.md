@@ -4,30 +4,21 @@
 This work is based on this [paper](https://www.nature.com/articles/s41598-017-17299-w).
 
 Due to their repeating nature crystal structures can be described by a basis and a set of atom coordinates within the so-called unit cell.
-A compound can then be described by a Gaussian field quantity
+A compound can then be described by a Gaussian field quantity mapping from real space to real numbers.
 
-
-<img src="figs/gauss_field_quantity.png" height="120px">
-</br>
-</br>
 
 The two plots below illustrate this mathematical description.
 
-<img src="figs/unit_cell.svg" width="49%">
-<img src="figs/unit_cell_gauss.png" width="49%">
+![](figs/unit_cell.svg)
+![](figs/unit_cell_gauss.png)
 
 
-Now the periodic field quantity can be expanded in a Fourier series over  reciprocal vectors
-
-<img src="figs/fourier.png" height="50px">
-</br>
-</br>
-
+The periodic field quantity can be expanded in a Fourier series over  reciprocal vectors.
 The Fourier coefficients can then be descretized to form a descriptor invariant with respect to translation and choice of unit cell and equivariant with respect to orthogonal transformations of the compound in real space.
 
-<img src="figs/reciprocal.svg" width="30%">
-<img src="figs/cartesian_descriptor.svg" width="30%">
-<img src="figs/spherical_descriptor.svg" width="30%">
+![](figs/reciprocal.svg)
+![](figs/cartesian_descriptor.svg)
+![](figs/spherical_descriptor.svg)
 
 The implementation of the descriptors can be found in `voxel.py`.
 Examples of the methods in use  can be found in `voxel_tutorial.ipynb` and demonstrations of the in-/equivariances in `reciprocal_space_properties.ipynb`.
