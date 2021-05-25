@@ -6,7 +6,8 @@ This work is based on this [paper](https://www.nature.com/articles/s41598-017-17
 Due to their repeating nature crystal structures can be described by a basis and a set of atom coordinates within the so-called unit cell.
 A compound can then be described by a Gaussian field quantity
 
-<img src="https://latex.codecogs.com/gif.latex?s(\mathbf{x})=\sum_{j=1}^n \frac{1}{(2\pi)^{3/2} \sigma^3} \sum_{n \in \mathbb{Z}^3}\exp\left(-\frac{1}{2\sigma^2}(\mathbf{x} - \boldsymbol{\mu}_j - \mathbf{A}\mathbf{n})^T(\mathbf{x} - \boldsymbol{\mu}_j -\mathbf{A}\mathbf{n})\right)." />
+
+<img src="figs/gauss_field_quantity.png" height="120px">
 </br>
 </br>
 
@@ -18,7 +19,7 @@ The two plots below illustrate this mathematical description.
 
 Now the periodic field quantity can be expanded in a Fourier series over  reciprocal vectors
 
-<img src="https://latex.codecogs.com/gif.latex?s(\mathbf{r}) = \sum_{\mathbf{g} \in \mathbf{G}} h(\mathbf{g})\exp(i\,\mathbf{g}\cdot\mathbf{r})">
+<img src="figs/fourier.png" height="50px">
 </br>
 </br>
 
